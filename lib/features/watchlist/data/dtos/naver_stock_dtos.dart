@@ -173,8 +173,10 @@ class NaverHistoricalPriceDto {
     // TODO(assignment): Parse one historical OHLCV row.
     //OHLCV => 주식 하루 데이터 한줄
     //의문점 api에서 진짜 숫자형태로 줄까 아니면 문자열 형태로 줄까
+    //근데 밑 함수를 보니 어떤 자료형인지 모르니까 자료형을 검사하여 파싱함수를 다르게 처리함
+    //그래서 밑 _ 함수를 사용하여 형변환하는것이 맞다고 생각
     return NaverHistoricalPriceDto(
-      localDate: _readLocalDate(['localDate']),
+      localDate: _readLocalDate(json['localDate']),
       closePrice: _readDouble(json['closePrice']),
       openPrice: _readDouble(json['openPrice']),
       highPrice: _readDouble(json['highPrice']),
@@ -207,11 +209,16 @@ class NaverHistoricalChartDto {
     // TODO(assignment): Parse the chart wrapper and convert each priceInfos
     // entry with NaverHistoricalPriceDto.fromJson.
 
+    print(json);
+    print(json.keys);
+
     //Dart에서 .map() => Iterable => List로 변환 필요
+    //--reporter expanded 옵션으로 찍어보니, code라고 나옴
+    //map을 돌리기전 타입 지정 하지않으면, map 자체는 수행하지만 결과 타입을 보장 못한다
     return NaverHistoricalChartDto(
-      symbol: _readString(json['symbol']),
+      symbol: _readString(json['code']),
       periodType: _readString(json['periodType']),
-      priceInfos: json['priceInfos']
+      priceInfos: (json['priceInfos'] as List)
           .map((info) => NaverHistoricalPriceDto.fromJson(info))
           .toList(),
     );
