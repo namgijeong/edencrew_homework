@@ -209,11 +209,10 @@ class NaverHistoricalChartDto {
     // TODO(assignment): Parse the chart wrapper and convert each priceInfos
     // entry with NaverHistoricalPriceDto.fromJson.
 
-    print(json);
-    print(json.keys);
 
     //Dart에서 .map() => Iterable => List로 변환 필요
     //--reporter expanded 옵션으로 찍어보니, code라고 나옴
+    //print(json);
     //map을 돌리기전 타입 지정 하지않으면, map 자체는 수행하지만 결과 타입을 보장 못한다
     return NaverHistoricalChartDto(
       symbol: _readString(json['code']),

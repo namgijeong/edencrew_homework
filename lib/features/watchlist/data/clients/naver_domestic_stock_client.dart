@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 
 import '../dtos/naver_stock_dtos.dart';
 
+//Future => 비동기 결과값 => promise와 유사
 abstract interface class NaverStockDataClient {
   Future<List<NaverAutocompleteItemDto>> searchStocks(String query);
 
@@ -102,6 +103,32 @@ class NaverDomesticStockClient implements NaverStockDataClient {
     // Related tests:
     // - test/features/watchlist/data/naver_stock_dtos_test.dart
     // - test/features/watchlist/data/naver_watchlist_repository_test.dart
+
+    final response = await _dio.get(
+      'https://ac.stock.naver.com/ac',
+      queryParameters: {
+        'q': query,
+        'target': 'stock,ipo,index,marketindicator',
+      },
+      options: Options(
+        headers: _defaultHeaders,
+        responseType: ResponseType.plain,
+      ),
+    );
+
+    //print('1');
+    //print(response);
+
+    //response 자체를 넘겨줄 경우 FormatException: searchStocks response body has unsupported shape
+    var decodedResponse = _decodeJsonObjectBody(response.data, 'searchStocks');
+
+    // {query: 삼성, items: [
+    // {code: 0044K0, name: 삼성스팩10호, typeCode: KOSDAQ, typeName: 코스닥, url: /domestic/stock/0044K0/total, reutersCode: 0044K0, nationCode: KOR, nationName: 대한민국, category: stock, hasDiscussion: true},
+    // {code: 0071M0, name: 삼성스팩11호, typeCode: KOSDAQ, typeName: 코스닥, url: /domestic/stock/0071M0/total, reutersCode: 0071M0, nationCode: KOR, nationName: 대한민국, category: stock, hasDiscussion: true}
+    // ] }
+    // print('2');
+    // print(decodedResponse);
+
     throw UnimplementedError(
       'TODO(assignment): implement NaverDomesticStockClient.searchStocks',
     );
