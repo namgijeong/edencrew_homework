@@ -34,7 +34,7 @@ class NaverAutocompleteItemDto {
 
     //dart는 new없이 객체를 생성
     return NaverAutocompleteItemDto(
-      code: json['code'] ,
+        code: json['code'] ,
         name : json['name'] ,
         typeCode : json['typeCode'],
         typeName : json['typeName'],
@@ -89,9 +89,20 @@ class NaverRealtimeQuoteDto {
     // - lv: low price
     // - aq: accumulated trading volume
     // - countOfListedStock: listed share count (optional)
-    throw UnimplementedError(
-      'TODO(assignment): implement NaverRealtimeQuoteDto.fromJson',
+    return NaverRealtimeQuoteDto(
+      symbol : json['cd'],
+      currentPrice : json['nv'],
+      previousClose : json['pcv'],
+      openPrice : json['ov'],
+      highPrice: json['hv'],
+      lowPrice : json['lv'],
+      accumulatedTradingVolume : json['aq'],
+      countOfListedStock : json['countOfListedStock'],
     );
+
+    // throw UnimplementedError(
+    //   'TODO(assignment): implement NaverRealtimeQuoteDto.fromJson',
+    // );
   }
 
   final String symbol;
@@ -117,6 +128,7 @@ class NaverRealtimeQuoteDto {
   }
 }
 
+//3.종목 메타데이터
 class NaverChartMetadataDto {
   const NaverChartMetadataDto({
     required this.symbol,
