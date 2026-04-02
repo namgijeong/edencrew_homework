@@ -138,9 +138,15 @@ class NaverChartMetadataDto {
 
   factory NaverChartMetadataDto.fromJson(Map<String, dynamic> json) {
     // TODO(assignment): Map the chart metadata payload into this DTO.
-    throw UnimplementedError(
-      'TODO(assignment): implement NaverChartMetadataDto.fromJson',
+
+    return NaverChartMetadataDto(
+        symbol : json['symbol'],
+        stockName : json['stockName'],
+        stockExchangeNameKor : json['stockExchangeNameKor'],
     );
+    // throw UnimplementedError(
+    //   'TODO(assignment): implement NaverChartMetadataDto.fromJson',
+    // );
   }
 
   final String symbol;
@@ -148,6 +154,7 @@ class NaverChartMetadataDto {
   final String stockExchangeNameKor;
 }
 
+//4. 일별 시세 HTML
 class NaverHistoricalPriceDto {
   const NaverHistoricalPriceDto({
     required this.localDate,
@@ -173,6 +180,7 @@ class NaverHistoricalPriceDto {
   final int accumulatedTradingVolume;
 }
 
+//이거는 기간타입인거같다
 class NaverHistoricalChartDto {
   const NaverHistoricalChartDto({
     required this.symbol,
@@ -193,6 +201,7 @@ class NaverHistoricalChartDto {
   final List<NaverHistoricalPriceDto> priceInfos;
 }
 
+//이건 하루 조회인것 같다
 class NaverDailyHistoryPageDto {
   const NaverDailyHistoryPageDto({
     required this.symbol,
