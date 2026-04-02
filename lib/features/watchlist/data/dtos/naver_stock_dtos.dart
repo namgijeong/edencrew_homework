@@ -34,13 +34,13 @@ class NaverAutocompleteItemDto {
 
     //dart는 new없이 객체를 생성
     return NaverAutocompleteItemDto(
-        code: json['code'] ,
-        name : json['name'] ,
-        typeCode : json['typeCode'],
-        typeName : json['typeName'],
-        url: json['url'],
-        nationCode : json['nationCode'],
-        category : json['category']
+        code: _readString(json['code']) ,
+        name : _readString(json['name']) ,
+        typeCode : _readString(json['typeCode']),
+        typeName : _readString(json['typeName']),
+        url: _readString(json['url']),
+        nationCode : _readString(json['nationCode']),
+        category : _readString(json['category'])
     );
 
     // throw UnimplementedError(
@@ -89,15 +89,17 @@ class NaverRealtimeQuoteDto {
     // - lv: low price
     // - aq: accumulated trading volume
     // - countOfListedStock: listed share count (optional)
+
+    //int에 int?를 대입못하므로..
     return NaverRealtimeQuoteDto(
-      symbol : json['cd'],
-      currentPrice : json['nv'],
-      previousClose : json['pcv'],
-      openPrice : json['ov'],
-      highPrice: json['hv'],
-      lowPrice : json['lv'],
-      accumulatedTradingVolume : json['aq'],
-      countOfListedStock : json['countOfListedStock'],
+      symbol : _readString(json['cd']),
+      currentPrice : _readDouble(json['nv']),
+      previousClose : _readDouble(json['pcv']),
+      openPrice : _readDouble(json['ov']),
+      highPrice: _readDouble(json['hv']),
+      lowPrice : _readDouble(json['lv']),
+      accumulatedTradingVolume : _readInt(json['aq']),
+      countOfListedStock : _readNullableInt(json['countOfListedStock']) ?? 0,
     );
 
     // throw UnimplementedError(
@@ -113,6 +115,7 @@ class NaverRealtimeQuoteDto {
   final double lowPrice;
   final int accumulatedTradingVolume;
   final int countOfListedStock;
+
 
   double get changeAmount => currentPrice - previousClose;
 
@@ -140,9 +143,9 @@ class NaverChartMetadataDto {
     // TODO(assignment): Map the chart metadata payload into this DTO.
 
     return NaverChartMetadataDto(
-        symbol : json['symbol'],
-        stockName : json['stockName'],
-        stockExchangeNameKor : json['stockExchangeNameKor'],
+        symbol : _readString(json['symbol']),
+        stockName : _readString(json['stockName']),
+        stockExchangeNameKor : _readString(json['stockExchangeNameKor']),
     );
     // throw UnimplementedError(
     //   'TODO(assignment): implement NaverChartMetadataDto.fromJson',
@@ -165,13 +168,25 @@ class NaverHistoricalPriceDto {
     required this.accumulatedTradingVolume,
   });
 
+  //일단 api 호출하는데서 html 파싱하는것 같다
   factory NaverHistoricalPriceDto.fromJson(Map<String, dynamic> json) {
     // TODO(assignment): Parse one historical OHLCV row.
-    throw UnimplementedError(
-      'TODO(assignment): implement NaverHistoricalPriceDto.fromJson',
+    //OHLCV => 주식 하루 데이터 한줄
+    //의문점 api에서 진짜 숫자형태로 줄까 아니면 문자열 형태로 줄까
+    return NaverHistoricalPriceDto(
+      localDate: _readLocalDate(['localDate']),
+      closePrice: _readDouble(json['closePrice']),
+      openPrice: _readDouble(json['openPrice']),
+      highPrice: _readDouble(json['highPrice']),
+      lowPrice: _readDouble(json['lowPrice']),
+      accumulatedTradingVolume: _readInt(json['accumulatedTradingVolume']),
     );
+    // throw UnimplementedError(
+    //   'TODO(assignment): implement NaverHistoricalPriceDto.fromJson',
+    // );
   }
 
+  //DateTime => YYYY-MM-DD HH:mm:ss.mmm
   final DateTime localDate;
   final double closePrice;
   final double openPrice;
@@ -191,9 +206,18 @@ class NaverHistoricalChartDto {
   factory NaverHistoricalChartDto.fromJson(Map<String, dynamic> json) {
     // TODO(assignment): Parse the chart wrapper and convert each priceInfos
     // entry with NaverHistoricalPriceDto.fromJson.
-    throw UnimplementedError(
-      'TODO(assignment): implement NaverHistoricalChartDto.fromJson',
+
+    //Dart에서 .map() => Iterable => List로 변환 필요
+    return NaverHistoricalChartDto(
+      symbol: _readString(json['symbol']),
+      periodType: _readString(json['periodType']),
+      priceInfos: json['priceInfos']
+          .map((info) => NaverHistoricalPriceDto.fromJson(info))
+          .toList(),
     );
+    // throw UnimplementedError(
+    //   'TODO(assignment): implement NaverHistoricalChartDto.fromJson',
+    // );
   }
 
   final String symbol;
@@ -216,6 +240,7 @@ class NaverDailyHistoryPageDto {
   final List<NaverHistoricalPriceDto> priceInfos;
 }
 
+//이 함수들을 써서 자료형을 맞추는것 같다
 DateTime _readLocalDate(Object? value) {
   final text = _readString(value);
   if (text.length != 8) {
