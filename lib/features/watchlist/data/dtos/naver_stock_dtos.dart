@@ -1,8 +1,10 @@
 // ignore_for_file: unused_element
 
 import '../../domain/services/watchlist_sorting.dart';
-
+//1. 검색 자동완성
 class NaverAutocompleteItemDto {
+
+  //생성자
   const NaverAutocompleteItemDto({
     required this.code,
     required this.name,
@@ -13,6 +15,10 @@ class NaverAutocompleteItemDto {
     required this.category,
   });
 
+  //클래스.생성자 => 이름있는 생성자
+  //JSON → Dart 객체 변환 함수
+  //dynamic -> 어떤 타입이든 가능
+  //factory -> 원하는 방식으로 객체를 만들어 반환하는 생성자
   factory NaverAutocompleteItemDto.fromJson(Map<String, dynamic> json) {
     // TODO(assignment): Read the autocomplete fields from json and create the
     // DTO. See README.md for the expected Naver endpoint and sample payload.
@@ -25,9 +31,22 @@ class NaverAutocompleteItemDto {
     // - url
     // - nationCode
     // - category
-    throw UnimplementedError(
-      'TODO(assignment): implement NaverAutocompleteItemDto.fromJson',
+
+    //dart는 new없이 객체를 생성
+    return NaverAutocompleteItemDto(
+      code: json['code'] ,
+        name : json['name'] ,
+        typeCode : json['typeCode'],
+        typeName : json['typeName'],
+        url: json['url'],
+        nationCode : json['nationCode'],
+        category : json['category']
     );
+
+    // throw UnimplementedError(
+    //   'TODO(assignment): implement NaverAutocompleteItemDto.fromJson',
+    // );
+
   }
 
   final String code;
@@ -45,6 +64,7 @@ class NaverAutocompleteItemDto {
       url.contains('/domestic/stock/');
 }
 
+//2. 실시간 시세
 class NaverRealtimeQuoteDto {
   const NaverRealtimeQuoteDto({
     required this.symbol,
