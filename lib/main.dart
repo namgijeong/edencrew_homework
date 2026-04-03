@@ -57,6 +57,10 @@ void main() async {
   //final result = await client.fetchRealtimeQuotes(['000660','005930']);
 
   //fetchChartMetadata 테스트
-  final result = await client.fetchChartMetadata('000660');
+  //final result = await client.fetchChartMetadata('000660');
+
+  //fetchDailyHistoryPage 테스트
+  final result = await client.fetchDailyHistoryPage(symbol:'000660', page:1);
+
   print('결과: $result');
 }

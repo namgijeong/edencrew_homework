@@ -3,8 +3,12 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart';
 
 import '../dtos/naver_stock_dtos.dart';
+
+import 'package:charset/charset.dart';
+import 'package:cp949_codec/cp949_codec.dart';
 
 //Future => 비동기 결과값 => promise와 유사
 abstract interface class NaverStockDataClient {
@@ -260,12 +264,13 @@ class NaverDomesticStockClient implements NaverStockDataClient {
 
     var decodedResponse = _decodeJsonObjectBody(response.data, 'fetchChartMetadata');
     return NaverChartMetadataDto.fromJson(decodedResponse);
-    throw UnimplementedError(
-      'TODO(assignment): implement NaverDomesticStockClient.fetchChartMetadata',
-    );
+    // throw UnimplementedError(
+    //   'TODO(assignment): implement NaverDomesticStockClient.fetchChartMetadata',
+    // );
   }
 
   @override
+  //{ } → named parameter 표시. 파라미터 사용시 이름 명시
   Future<NaverDailyHistoryPageDto> fetchDailyHistoryPage({
     required String symbol,
     required int page,
@@ -276,7 +281,7 @@ class NaverDomesticStockClient implements NaverStockDataClient {
     // - Validate that page >= 1.
     // - Request https://finance.naver.com/item/sise_day.naver
     //   with code=<symbol> and page=<page>.
-    // - Use ResponseType.bytes and decode the HTML with latin1.
+    // - Use ResponseType.bytes and decode the HTML with latin1. //ISO-8859-1
     // - Parse one page of historical rows from the HTML table.
     // - For each row, extract:
     //   - localDate (yyyyMMdd)
@@ -290,9 +295,51 @@ class NaverDomesticStockClient implements NaverStockDataClient {
     // Hint:
     // - The rendered table order is close, change, open, high, low, volume.
     // - You can keep using NaverHistoricalPriceDto.fromJson to build rows.
+
+    if (page < 1){
+      throw FormatException('page는 1이상이어야 합니다');
+    }
+    final response = await _dio.get(
+      'https://finance.naver.com/item/sise_day.naver',
+      queryParameters: {
+        'code': symbol,
+        'page': page,
+      },
+      options: Options(
+        headers: _defaultHeaders,
+        responseType: ResponseType.bytes,
+      ),
+    );
+
+    // print(1);
+    // print(latin1.decode(response.data));
+    // debugPrint(latin1.decode(response.data));
+
+    // print(2);
+    //print(eucKr.decode(response.data));
+    // debugPrint(eucKr.decode(response.data));
+
+    //이렇게 cp949로 decode를 하니 콘솔에 한글이 깨지지 않고 출력
+    final htmlString = cp949.decode(response.data);
+
+    // print(htmlString.contains('증권'));
+    // print(htmlString.contains('시세'));
+    // print(htmlString.contains('날짜'));
+    // print('cp949 title idx: ${htmlString.indexOf("<title>")}');
+    // final cp94Idx = htmlString.indexOf('<title>');
+    // if (cp94Idx != -1) {
+    //   print(cp94.substring(cp94Idx, cp94Idx + 40));
+    // }
+
+    debugPrint(htmlString);
+
+    //var decodedResponse = _decodeJsonObjectBody(response.data, 'fetchChartMetadata');
+
+
     throw UnimplementedError(
       'TODO(assignment): implement NaverDomesticStockClient.fetchDailyHistoryPage',
     );
+
   }
 }
 
