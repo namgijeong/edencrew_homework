@@ -129,6 +129,10 @@ class NaverDomesticStockClient implements NaverStockDataClient {
     // print('2');
     // print(decodedResponse);
 
+    var decodedItems = decodedResponse['items'] as List;
+    var naverAutocompleteItemDtoList = decodedItems.map((item) => NaverAutocompleteItemDto.fromJson(item)).toList();
+    return naverAutocompleteItemDtoList;
+
     throw UnimplementedError(
       'TODO(assignment): implement NaverDomesticStockClient.searchStocks',
     );
