@@ -161,9 +161,9 @@ class NaverDomesticStockClient implements NaverStockDataClient {
     var deDuplicatedSymbols = symbols.toSet().toList();
     //join('|') 내부 동작 => 요소1 + '|' + 요소2 + '|' + 요소3
     var queryString = deDuplicatedSymbols.map((symbol)=>'SERVICE_ITEM:$symbol').join('|');
-    print(0);
-    print(queryString);
-    print(Uri.encodeQueryComponent(queryString));
+    // print(0);
+    // print(queryString);
+    // print(Uri.encodeQueryComponent(queryString));
 
     var finedQueryString = Uri.encodeQueryComponent(queryString).replaceAll('%7C', '|')
         .replaceAll('%3A', ':');
@@ -192,7 +192,9 @@ class NaverDomesticStockClient implements NaverStockDataClient {
     //   ),
     // );
 
-    //하나하니씩 보내는 버전
+    // 참고: 실험결과 맨 마지막에 있는것만 조회를 함
+    //final result = await client.fetchRealtimeQuotes(['005930','000660']);
+    //한개당 한번씩 api 요청 보내는 버전
     final futures = deDuplicatedSymbols.map((symbol) async {
       final response = await _dio.get(
         'https://polling.finance.naver.com/api/realtime',
@@ -206,39 +208,28 @@ class NaverDomesticStockClient implements NaverStockDataClient {
       );
 
     var decodedResponse = _decodeJsonObjectBody(response.data, 'fetchRealtimeQuotes');
-      print('2');
-      print(decodedResponse);
+      // print('2');
+      // print(decodedResponse);
 
       // {resultCode: success,
       // result: {pollingInterval: 7000,
       // areas: [{name: SERVICE_ITEM, datas: [{cd: 000660, nm: SK���̴н�, sv: 830000, nv: 880000, cv: 50000, cr: 6.02, rf: 2, mt: 1, ms: OPEN, tyn: N, pcv: 830000, ov: 867000, hv: 886000, lv: 860000, ul: 1079000, ll: 581000, aq: 2501030, aa: 2189654076500.0, nav: null, keps: 28732, eps: 58955, bps: 174538.50083, cnsEps: 194874, dv: 3000.0, countOfListedStock: 712702365, nxtOverMarketPriceInfo: {tradingSessionType: REGULAR_MARKET, overMarketStatus: OPEN, overPrice: 880,000, openPrice: 843,000, highPrice: 886,000, lowPrice: 843,000, compareToPreviousPrice: {code: 2, text: ���, name: RISING}, compareToPreviousClosePrice: 50,000, fluctuationsRatio: 6.02, localTradedAt: 2026-04-03T14:38:21.507635+09:00, tradeStopType: {code: 1, text: �.Trading, name: TRADING}, accumulatedTradingVolume: 1,629,927, accumulatedTradingValue: 1,420,250�鸸}}]}], time: 1775194701507}}
-      print('3');
-      print(decodedResponse['result']['areas'][0]['datas'].length);
+      // print('3');
+      // print(decodedResponse['result']['areas'][0]['datas'].length);
 
       //MapEntry = Map의 “한 쌍 (key, value)”
       return MapEntry(symbol, NaverRealtimeQuoteDto.fromJson(decodedResponse['result']['areas'][0]['datas'][0]));
     });
 
     final results = Map.fromEntries(await Future.wait(futures));
-    print('4');
-    print(results);
-
-    // print('1');
-    // print(response.data);
-    //
-    // //response 자체를 넘겨줄 경우 FormatException: searchStocks response body has unsupported shape
-    // var decodedResponse = _decodeJsonObjectBody(response.data, 'fetchRealtimeQuotes');
-    // print('2');
-    // print(decodedResponse);
-    //
-    // print('3');
-    // print(decodedResponse['result']['areas'][0]['datas'].length);
+    // print('4');
+    // print(results);
 
     return results;
 
-    throw UnimplementedError(
-      'TODO(assignment): implement NaverDomesticStockClient.fetchRealtimeQuotes',
-    );
+    // throw UnimplementedError(
+    //   'TODO(assignment): implement NaverDomesticStockClient.fetchRealtimeQuotes',
+    // );
   }
 
   @override
@@ -255,6 +246,20 @@ class NaverDomesticStockClient implements NaverStockDataClient {
     // - symbolCode
     // - stockName
     // - stockExchangeNameKor
+
+    final response = await _dio.get(
+      'https://stock.naver.com/api/securityFe/api/fchart/domestic/stock/$symbol',
+      options: Options(
+        headers: _defaultHeaders,
+        responseType: ResponseType.plain,
+      ),
+    );
+
+    print(response.data);
+    //{"chartNationType":"domestic","chartInfoType":"item","itemCode":"000660","symbolCode":"000660","stockName":"SK하이닉스","stockExchangeName":"KOSPI","stockExchangeNameKor":"코스피","nationType":"KOR","stockType":"domestic","stockEndType":"stock","endUrl":"https://m.stock.naver.com/domestic/stock/000660","isDelisting":false}
+
+    var decodedResponse = _decodeJsonObjectBody(response.data, 'fetchChartMetadata');
+    return NaverChartMetadataDto.fromJson(decodedResponse);
     throw UnimplementedError(
       'TODO(assignment): implement NaverDomesticStockClient.fetchChartMetadata',
     );

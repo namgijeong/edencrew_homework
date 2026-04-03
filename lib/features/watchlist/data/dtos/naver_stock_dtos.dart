@@ -143,7 +143,7 @@ class NaverChartMetadataDto {
     // TODO(assignment): Map the chart metadata payload into this DTO.
 
     return NaverChartMetadataDto(
-        symbol : _readString(json['symbol']),
+        symbol : _readString(json['symbolCode']),
         stockName : _readString(json['stockName']),
         stockExchangeNameKor : _readString(json['stockExchangeNameKor']),
     );

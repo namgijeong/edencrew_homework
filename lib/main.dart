@@ -54,7 +54,9 @@ void main() async {
   //실험결과 맨 마지막에 있는것만 조회를 함
   //즉 한번에 query로 다 있는것이 아닌 한개당 한번씩 api 요청 필요
   //final result = await client.fetchRealtimeQuotes(['005930','000660']);
-  final result = await client.fetchRealtimeQuotes(['000660','005930']);
+  //final result = await client.fetchRealtimeQuotes(['000660','005930']);
 
+  //fetchChartMetadata 테스트
+  final result = await client.fetchChartMetadata('000660');
   print('결과: $result');
 }
