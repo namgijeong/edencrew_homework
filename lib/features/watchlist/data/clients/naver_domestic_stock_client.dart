@@ -209,12 +209,19 @@ class NaverDomesticStockClient implements NaverStockDataClient {
       print('2');
       print(decodedResponse);
 
+      // {resultCode: success,
+      // result: {pollingInterval: 7000,
+      // areas: [{name: SERVICE_ITEM, datas: [{cd: 000660, nm: SK���̴н�, sv: 830000, nv: 880000, cv: 50000, cr: 6.02, rf: 2, mt: 1, ms: OPEN, tyn: N, pcv: 830000, ov: 867000, hv: 886000, lv: 860000, ul: 1079000, ll: 581000, aq: 2501030, aa: 2189654076500.0, nav: null, keps: 28732, eps: 58955, bps: 174538.50083, cnsEps: 194874, dv: 3000.0, countOfListedStock: 712702365, nxtOverMarketPriceInfo: {tradingSessionType: REGULAR_MARKET, overMarketStatus: OPEN, overPrice: 880,000, openPrice: 843,000, highPrice: 886,000, lowPrice: 843,000, compareToPreviousPrice: {code: 2, text: ���, name: RISING}, compareToPreviousClosePrice: 50,000, fluctuationsRatio: 6.02, localTradedAt: 2026-04-03T14:38:21.507635+09:00, tradeStopType: {code: 1, text: �.Trading, name: TRADING}, accumulatedTradingVolume: 1,629,927, accumulatedTradingValue: 1,420,250�鸸}}]}], time: 1775194701507}}
       print('3');
       print(decodedResponse['result']['areas'][0]['datas'].length);
 
+      //MapEntry = Map의 “한 쌍 (key, value)”
+      return MapEntry(symbol, NaverRealtimeQuoteDto.fromJson(decodedResponse['result']['areas'][0]['datas'][0]));
     });
 
-    final results = await Future.wait(futures);
+    final results = Map.fromEntries(await Future.wait(futures));
+    print('4');
+    print(results);
 
     // print('1');
     // print(response.data);
@@ -227,6 +234,7 @@ class NaverDomesticStockClient implements NaverStockDataClient {
     // print('3');
     // print(decodedResponse['result']['areas'][0]['datas'].length);
 
+    return results;
 
     throw UnimplementedError(
       'TODO(assignment): implement NaverDomesticStockClient.fetchRealtimeQuotes',
