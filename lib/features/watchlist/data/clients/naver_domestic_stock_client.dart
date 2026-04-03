@@ -133,9 +133,9 @@ class NaverDomesticStockClient implements NaverStockDataClient {
     var naverAutocompleteItemDtoList = decodedItems.map((item) => NaverAutocompleteItemDto.fromJson(item)).toList();
     return naverAutocompleteItemDtoList;
 
-    throw UnimplementedError(
-      'TODO(assignment): implement NaverDomesticStockClient.searchStocks',
-    );
+    // throw UnimplementedError(
+    //   'TODO(assignment): implement NaverDomesticStockClient.searchStocks',
+    // );
   }
 
   @override
@@ -145,7 +145,7 @@ class NaverDomesticStockClient implements NaverStockDataClient {
     // TODO(assignment): Implement the Naver realtime quote request.
     //
     // Goal:
-    // - Deduplicate the incoming symbols.
+    // - Deduplicate the incoming symbols. //중복을 제거하라
     // - Return an empty map when there is nothing to request.
     // - Build query=SERVICE_ITEM:005930|SERVICE_ITEM:000660 style payload.
     // - Call https://polling.finance.naver.com/api/realtime.
@@ -156,6 +156,78 @@ class NaverDomesticStockClient implements NaverStockDataClient {
     // Note:
     // - The response body may be plain text JSON, so use ResponseType.plain.
     // - Some tests use a fake client, but the real app depends on this method.
+
+    //set => list로 변환 필요
+    var deDuplicatedSymbols = symbols.toSet().toList();
+    //join('|') 내부 동작 => 요소1 + '|' + 요소2 + '|' + 요소3
+    var queryString = deDuplicatedSymbols.map((symbol)=>'SERVICE_ITEM:$symbol').join('|');
+    print(0);
+    print(queryString);
+    print(Uri.encodeQueryComponent(queryString));
+
+    var finedQueryString = Uri.encodeQueryComponent(queryString).replaceAll('%7C', '|')
+        .replaceAll('%3A', ':');
+
+    //인코딩 버전
+    // final response = await _dio.get(
+    //   'https://polling.finance.naver.com/api/realtime',
+    //   queryParameters: {
+    //     'query': queryString,
+    //   },
+    //   options: Options(
+    //     headers: _defaultHeaders,
+    //     responseType: ResponseType.plain,
+    //   ),
+    // );
+
+    //직접 Url 버전
+    // final url =
+    //     'https://polling.finance.naver.com/api/realtime?query=$finedQueryString';
+    // print(url);
+    // final response = await _dio.get(
+    //   url,
+    //   options: Options(
+    //     headers: _defaultHeaders,
+    //     responseType: ResponseType.plain,
+    //   ),
+    // );
+
+    //하나하니씩 보내는 버전
+    final futures = deDuplicatedSymbols.map((symbol) async {
+      final response = await _dio.get(
+        'https://polling.finance.naver.com/api/realtime',
+        queryParameters: {
+          'query': 'SERVICE_ITEM:$symbol',
+        },
+        options: Options(
+          headers: _defaultHeaders,
+          responseType: ResponseType.plain,
+        ),
+      );
+
+    var decodedResponse = _decodeJsonObjectBody(response.data, 'fetchRealtimeQuotes');
+      print('2');
+      print(decodedResponse);
+
+      print('3');
+      print(decodedResponse['result']['areas'][0]['datas'].length);
+
+    });
+
+    final results = await Future.wait(futures);
+
+    // print('1');
+    // print(response.data);
+    //
+    // //response 자체를 넘겨줄 경우 FormatException: searchStocks response body has unsupported shape
+    // var decodedResponse = _decodeJsonObjectBody(response.data, 'fetchRealtimeQuotes');
+    // print('2');
+    // print(decodedResponse);
+    //
+    // print('3');
+    // print(decodedResponse['result']['areas'][0]['datas'].length);
+
+
     throw UnimplementedError(
       'TODO(assignment): implement NaverDomesticStockClient.fetchRealtimeQuotes',
     );
