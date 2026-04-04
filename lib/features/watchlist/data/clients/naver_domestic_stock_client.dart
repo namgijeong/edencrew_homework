@@ -10,6 +10,9 @@ import '../dtos/naver_stock_dtos.dart';
 import 'package:charset/charset.dart';
 import 'package:cp949_codec/cp949_codec.dart';
 
+import 'package:html/parser.dart' as parser;
+import 'package:html/dom.dart';
+
 //Future => 비동기 결과값 => promise와 유사
 abstract interface class NaverStockDataClient {
   Future<List<NaverAutocompleteItemDto>> searchStocks(String query);
@@ -331,14 +334,50 @@ class NaverDomesticStockClient implements NaverStockDataClient {
     //   print(cp94.substring(cp94Idx, cp94Idx + 40));
     // }
 
-    debugPrint(htmlString);
+    //debugPrint(htmlString);
 
-    //var decodedResponse = _decodeJsonObjectBody(response.data, 'fetchChartMetadata');
+    //tr에서 1,2,4,5,6,7 번째 컬럼을 골라야함
+    //한페이지당 총 10개의 데이터
+    //1,7 번째 tr은 제외 => 근데 놓친것도 있으므로 col 개수를 세는 것이 빠름
+    //lastPage 정보는 Nnavi table에 td class="pgRR"
+    //a href="/item/sise_day.naver?code=000660&amp;page=730" 파싱
 
+    final document = parser.parse(htmlString);
 
-    throw UnimplementedError(
-      'TODO(assignment): implement NaverDomesticStockClient.fetchDailyHistoryPage',
-    );
+    var rows = document.querySelectorAll('table.type2 tr');
+    List<NaverHistoricalPriceDto> priceInfos=[];
+    for (int i = 0; i < rows.length; i++){
+        var cols = rows[i].querySelectorAll('td');
+
+        //몇줄을 패스할지 세는것도 헷갈리므로
+        if (cols.length < 7) {
+          continue;
+        }
+
+        NaverHistoricalPriceDto priceDto;
+
+        //2026.04.03 이형태로 날짜를 주는데 .을 없애야함
+        priceDto = NaverHistoricalPriceDto.fromJson(
+            {'localDate':cols[0].querySelector('span')?.text.trim().replaceAll('.',''), 'closePrice':cols[1].querySelector('span')?.text.trim(), 'openPrice':cols[3].querySelector('span')?.text.trim(),'highPrice':cols[4].querySelector('span')?.text.trim(), 'lowPrice': cols[5].querySelector('span')?.text.trim(), 'accumulatedTradingVolume':cols[6].querySelector('span')?.text.trim()}
+        );
+        priceInfos.add(priceDto);
+    }
+
+    debugPrint(priceInfos.toString());
+
+    var lastPageTd = document.querySelector('table.Nnavi td.pgRR a');
+    //?. => 요소가 없으면 그냥 null 반환
+    var lastPageHref = lastPageTd?.attributes['href'];
+
+    debugPrint(lastPageHref);
+    var lastPageSubstring = lastPageHref?.split('&')[1];
+    var lastPage = int.parse(lastPageSubstring?.split('=')[1] ?? '');
+
+    return NaverDailyHistoryPageDto(symbol:symbol,page:page,lastPage:lastPage,priceInfos:priceInfos);
+
+    // throw UnimplementedError(
+    //   'TODO(assignment): implement NaverDomesticStockClient.fetchDailyHistoryPage',
+    // );
 
   }
 }
