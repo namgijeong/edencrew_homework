@@ -65,6 +65,10 @@ class NaverWatchlistRepository implements WatchlistRepository {
     //terable<String>으로 변환 필요
     var NaverRealtimeQuoteDtoMap = await _loadRealtimeQuotes(symbols);
 
+    //날짜에 존재여부 따라 _HistoricalEntry를 구한다 => NaverHistoricalPriceDto + 가장 마지막으로 책정된 가격 반환
+    // _loadHistoricalEntryForDate, _loadLatestHistoricalEntry
+
+
     throw UnimplementedError(
       'TODO(assignment): implement NaverWatchlistRepository.fetchWatchlist',
     );
@@ -76,13 +80,49 @@ class NaverWatchlistRepository implements WatchlistRepository {
     //
     // Suggested flow:
     // - Reuse _availableDatesCache when present.
-    // - Pick the first valid favorite symbol as the reference symbol.
+    // - Pick the first valid favorite symbol as the reference symbol. //기준 종목으로 사용하기 위해
     // - Request page 1 first to discover lastPage.
-    // - Fetch the remaining pages in small batches.
+    // - Fetch the remaining pages in small batches. //여러 페이지를 조금씩 나눠서 병렬로 요청
     // - Flatten all localDate values into one descending list.
-    throw UnimplementedError(
-      'TODO(assignment): implement NaverWatchlistRepository.fetchAvailableDates',
-    );
+
+    final cached = _availableDatesCache;
+    if (cached != null) {
+      return cached;
+    }
+
+    var favoriteIds = await loadFavoriteIds();
+    print(favoriteIds);
+
+    //whereType<String>() //null 자동 제거 + String으로 변환
+    var symbols = favoriteIds.map((id)=>domesticSymbolFromFavoriteId(id)).whereType<String>();
+    var refSymbol = symbols.first;
+
+    var naverDailyHistoryPageDto = await _loadDailyHistoryPage(refSymbol, 1);
+    var lastPage = naverDailyHistoryPageDto.lastPage;
+
+    //map은 Iterable 반환
+    // ... spread 연산자
+    var availableDates = <DateTime>[];
+    //addAll => Iterable을 순회해서 요소를 하나씩 넣는다
+    availableDates.addAll(naverDailyHistoryPageDto.priceInfos.map((info) => info.localDate));
+
+    var requestResults;
+    //batchs를 쓰라 했으므로 혹시나 batchsize가 있는지 찾아보았다
+    for(int i = 2; i <= lastPage; i = dailyHistoryFetchBatchSize){
+      final batchFutures = <Future>[];
+      for (int j = i; j < i + dailyHistoryFetchBatchSize && j <= lastPage; j++) {
+        batchFutures.add(_loadDailyHistoryPage(refSymbol, j));
+      }
+
+      //Future.wait => 여러 개의 Future(비동기 작업)를 동시에 실행하고, 전부 끝날 때까지 기다리는 함수
+      requestResults = await Future.wait(batchFutures);
+      availableDates.addAll(requestResults.priceInfos.map((info) => info.localDate));
+    }
+
+    return availableDates;
+    // throw UnimplementedError(
+    //   'TODO(assignment): implement NaverWatchlistRepository.fetchAvailableDates',
+    // );
   }
 
   @override
@@ -354,7 +394,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
   WatchlistItem _buildWatchlistItem({
     required String symbol,
     required NaverChartMetadataDto metadata,
-    required _HistoricalEntry historicalEntry, ////NaverHistoricalPriceDto + 가장 마지막으로 책정된 가격 반환
+    required _HistoricalEntry historicalEntry, //NaverHistoricalPriceDto + 가장 마지막으로 책정된 가격 반환
     required NaverRealtimeQuoteDto? realtimeQuote,
     required DateTime? latestDate,
   }) {

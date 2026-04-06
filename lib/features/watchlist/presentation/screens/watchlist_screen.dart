@@ -29,7 +29,7 @@ class WatchlistScreen extends ConsumerStatefulWidget {
 class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
   late final AppLifecycleListener _appLifecycleListener;
   List<DateTime>? _availableDatesCache;
-  Future<List<DateTime>>? _availableDatesFuture;
+  Future<List<DateTime>>? _availableDatesFuture; //API 중복 호출 방지
 
   @override
   void initState() {
