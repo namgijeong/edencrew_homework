@@ -61,17 +61,50 @@ class NaverWatchlistRepository implements WatchlistRepository {
     var symbols = favoriteIds.map((id)=>domesticSymbolFromFavoriteId(id)).whereType<String>();
 
     //List<String>으로 변환 필요
-    var NaverChartMetadataDtoMap = await _loadMetadataBatch(symbols.toList());
-    //terable<String>으로 변환 필요
-    var NaverRealtimeQuoteDtoMap = await _loadRealtimeQuotes(symbols);
+    var naverChartMetadataDtoMap = await _loadMetadataBatch(symbols.toList());
+    //iterable<String>으로 변환 필요
+    var naverRealtimeQuoteDtoMap = await _loadRealtimeQuotes(symbols);
 
+    var availableDates = await fetchAvailableDates();
+
+    //하지만 이렇게 하면 어느 symbol에 대한 건지 몰라서 watchListItem을 만들때 _HistoricalEntry를 만든다
     //날짜에 존재여부 따라 _HistoricalEntry를 구한다 => NaverHistoricalPriceDto + 가장 마지막으로 책정된 가격 반환
     // _loadHistoricalEntryForDate, _loadLatestHistoricalEntry
+    // var futureHistoricalEntries = <Future<_HistoricalEntry>>[];
+    // var historicalEntries = <_HistoricalEntry>[];
+    //
+    // if (asOf == null){
+    //   futureHistoricalEntries = symbols.map((symbol) =>  _loadLatestHistoricalEntry(symbol)).whereType<Future<_HistoricalEntry>>().toList();
+    //   historicalEntries = await Future.wait(futureHistoricalEntries);
+    // } else {
+    //   //whereType => null 자동제거 및 형변환
+    //   futureHistoricalEntries = symbols.map((symbol) =>  _loadHistoricalEntryForDate(symbol:symbol, availableDates:availableDates, asOf:asOf)).whereType<Future<_HistoricalEntry>>().toList();
+    //   historicalEntries = await Future.wait(futureHistoricalEntries);
+    // }
 
+    //wathchlistitem을 하나씩 만든다
+    List<WatchlistItem> items= [];
 
-    throw UnimplementedError(
-      'TODO(assignment): implement NaverWatchlistRepository.fetchWatchlist',
-    );
+    items = symbols.map((symbol) {
+      //symbol에 맞는 _HistoricalEntry 만들기
+      var historicalEntry;
+      if (asOf == null){
+        historicalEntry = _loadLatestHistoricalEntry(symbol);
+      } else {
+        historicalEntry = _loadHistoricalEntryForDate(symbol:symbol, availableDates:availableDates, asOf:asOf);
+      }
+
+      //! null 아님을 보장
+       return _buildWatchlistItem(symbol:symbol,metadata:naverChartMetadataDtoMap[symbol]!, historicalEntry: historicalEntry, realtimeQuote:naverRealtimeQuoteDtoMap[symbol], latestDate:availableDates[0]);
+    }).toList();
+
+    WatchlistSnapshot watchlistSnapshot = WatchlistSnapshot(asOf:asOf ?? availableDates[0], items:items, availableDates:availableDates);
+
+    return watchlistSnapshot;
+
+    // throw UnimplementedError(
+    //   'TODO(assignment): implement NaverWatchlistRepository.fetchWatchlist',
+    // );
   }
 
   @override
