@@ -114,7 +114,7 @@ class NaverRealtimeQuoteDto {
   final double highPrice;
   final double lowPrice;
   final int accumulatedTradingVolume;
-  final int countOfListedStock;
+  final int countOfListedStock; //상장된 주식의 개수, 그 회사가 시장에 상장해 놓은 전체 주식 수
 
 
   double get changeAmount => currentPrice - previousClose;

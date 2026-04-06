@@ -49,7 +49,7 @@ class WatchlistItem {
   final double currentPrice;
   final double changeRate;
   final int tradeVolume;
-  final int marketCap;
+  final int marketCap; //시총, 시가총액 => 회사의 전체 가치를 현재 주가 기준으로 계산한 것
   final String? logoUrl;
 
   PriceChangeDirection get direction => directionFromDelta(changeRate);

@@ -43,7 +43,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
     // TODO(assignment): Build the watchlist snapshot from Naver data.
     //
     // Suggested flow:
-    // 1. Load canonical favorite ids via loadFavoriteIds().
+    // 1. Load canonical favorite ids via loadFavoriteIds(). //표준화된 즐겨찾기 ID 목록
     // 2. Convert each id into a six-digit domestic symbol.
     // 3. Load metadata and realtime quotes for those symbols.
     // 4. When asOf is null, use the latest historical row for each symbol.
@@ -53,6 +53,18 @@ class NaverWatchlistRepository implements WatchlistRepository {
     //
     // Related tests:
     // - test/features/watchlist/data/naver_watchlist_repository_test.dart
+
+    var favoriteIds = await loadFavoriteIds();
+    print(favoriteIds);
+
+    //whereType<String>() //null 자동 제거 + String으로 변환
+    var symbols = favoriteIds.map((id)=>domesticSymbolFromFavoriteId(id)).whereType<String>();
+
+    //List<String>으로 변환 필요
+    var NaverChartMetadataDtoMap = await _loadMetadataBatch(symbols.toList());
+    //terable<String>으로 변환 필요
+    var NaverRealtimeQuoteDtoMap = await _loadRealtimeQuotes(symbols);
+
     throw UnimplementedError(
       'TODO(assignment): implement NaverWatchlistRepository.fetchWatchlist',
     );
@@ -153,6 +165,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
     await _favoriteIdsLocalStore.saveRawIds(favoriteIds);
   }
 
+  //fetchChartMetadata 불러오기
   Future<Map<String, NaverChartMetadataDto>> _loadMetadataBatch(
     List<String> symbols,
   ) async {
@@ -178,6 +191,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
     return metadata;
   }
 
+  //fetchDailyHistoryPage 일일 시세 불러오기
   Future<NaverDailyHistoryPageDto> _loadDailyHistoryPage(
     String symbol,
     int page,
@@ -196,6 +210,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
     return historyPage;
   }
 
+  //fetchRealtimeQuotes 여러 symbol을 가지고 불러오기
   Future<Map<String, NaverRealtimeQuoteDto>> _loadRealtimeQuotes(
     Iterable<String> symbols,
   ) async {
@@ -238,6 +253,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
     return quotes;
   }
 
+  //입력한 date에 일치하는것 찾기
   Future<_HistoricalEntry?> _loadHistoricalEntryForDate({
     required String symbol,
     required List<DateTime> availableDates,
@@ -249,34 +265,49 @@ class NaverWatchlistRepository implements WatchlistRepository {
     }
 
     final selectedPageNumber = _pageNumberForIndex(selectedIndex);
+    //fetchDailyHistoryPage => NaverDailyHistoryPageDto 불러오기
     final selectedPage = await _loadDailyHistoryPage(
       symbol,
       selectedPageNumber,
     );
+    //날짜와 일치하는 NaverHistoricalPriceDto
     final selectedRow = _rowForDate(selectedPage.priceInfos, asOf);
     if (selectedRow == null) {
       return null;
     }
 
+    // map 생성 문법
+    //{
+    //   for (요소 in 리스트)
+    //     key: value
+    // }
+
+    ////가장 마지막으로 책정된 가격 반환
     final previousClose = await _resolvePreviousClose(
       symbol: symbol,
       availableDates: availableDates,
       selectedIndex: selectedIndex,
-      fallbackOpenPrice: selectedRow.openPrice,
+      fallbackOpenPrice: selectedRow.openPrice, //NaverHistoricalPriceDto의 openPrice
       rowsByDate: {
         for (final row in selectedPage.priceInfos) _dateKey(row.localDate): row,
       },
     );
 
+    //NaverHistoricalPriceDto + 가장 마지막으로 책정된 가격 반환
     return _HistoricalEntry(row: selectedRow, previousClose: previousClose);
   }
 
+  //입력한 date가 없을때 지정된 날짜를 찾는것 같다
   Future<_HistoricalEntry?> _loadLatestHistoricalEntry(String symbol) async {
+    //fetchDailyHistoryPage => NaverDailyHistoryPageDto 불러오기
     final firstPage = await _loadDailyHistoryPage(symbol, 1);
     if (firstPage.priceInfos.isEmpty) {
       return null;
     }
 
+    //NaverHistoricalPriceDto
+    //충분한 개수가 없으면 다음 페이지를 조회하여 가장 최근 이전 거래일 종가를 찾는다
+    //.first => List에서 첫번째 요소
     final selectedRow = firstPage.priceInfos.first;
     double previousClose = selectedRow.openPrice;
     if (firstPage.priceInfos.length > 1) {
@@ -288,9 +319,11 @@ class NaverWatchlistRepository implements WatchlistRepository {
       }
     }
 
+    //NaverHistoricalPriceDto + 가장 마지막으로 책정된 가격 반환
     return _HistoricalEntry(row: selectedRow, previousClose: previousClose);
   }
 
+  //가장 마지막으로 책정된 가격 반환
   Future<double> _resolvePreviousClose({
     required String symbol,
     required List<DateTime> availableDates,
@@ -308,6 +341,8 @@ class NaverWatchlistRepository implements WatchlistRepository {
       return previousRowFromCache.closePrice;
     }
 
+    //fetchDailyHistoryPage 일일 시세 불러오기
+    //즉 이전날짜가 없으면 페이지를 증가시켜 이전 날짜를 불러오는 것 같다
     final page = await _loadDailyHistoryPage(
       symbol,
       _pageNumberForIndex(selectedIndex + 1),
@@ -319,7 +354,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
   WatchlistItem _buildWatchlistItem({
     required String symbol,
     required NaverChartMetadataDto metadata,
-    required _HistoricalEntry historicalEntry,
+    required _HistoricalEntry historicalEntry, ////NaverHistoricalPriceDto + 가장 마지막으로 책정된 가격 반환
     required NaverRealtimeQuoteDto? realtimeQuote,
     required DateTime? latestDate,
   }) {
@@ -379,6 +414,8 @@ class NaverWatchlistRepository implements WatchlistRepository {
     return availableDates.first;
   }
 
+  ////yyyy-mm-dd 00:00:00.000 => 시간을 00으로 초기화 한후,
+  //asOf 입력한 날짜와 동일한 availableDates에 해당하는 인덱스를 리턴
   int? _indexOfDate(List<DateTime> availableDates, DateTime asOf) {
     final normalizedAsOf = normalizeAsOfDate(asOf);
     for (var index = 0; index < availableDates.length; index += 1) {
@@ -389,10 +426,12 @@ class NaverWatchlistRepository implements WatchlistRepository {
     return null;
   }
 
+  // ~/ 는정수 나눗셈 => 이 인덱스 데이터가 위치한 페이지 번호가 뭔지
   int _pageNumberForIndex(int index) {
     return (index ~/ _historyRowsPerPage) + 1;
   }
 
+  //날짜에 일치하는 일별 시세 한줄을 찾기
   NaverHistoricalPriceDto? _rowForDate(
     Iterable<NaverHistoricalPriceDto> rows,
     DateTime date,
@@ -485,8 +524,10 @@ class NaverWatchlistRepository implements WatchlistRepository {
 
   String _dailyHistoryPageCacheKey(String symbol, int page) => '$symbol::$page';
 
+  //00.00.00으로 초기화
   String _dateKey(DateTime value) => formatApiDate(value);
 
+  //증감률을 구할때 사용
   double _percentChange(double delta, double base) {
     if (base == 0) {
       return 0;
@@ -495,6 +536,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
   }
 }
 
+//실시간 시세인데 언제 fetch함수를 사용했는지인것 같다
 class _RealtimeQuoteCacheEntry {
   const _RealtimeQuoteCacheEntry({
     required this.quote,
@@ -505,6 +547,8 @@ class _RealtimeQuoteCacheEntry {
   final DateTime fetchedAt;
 }
 
+//일별시세인데 previousClose가 뭘까?
+//previousClose => 가장 마지막으로 책정된 가격
 class _HistoricalEntry {
   const _HistoricalEntry({required this.row, required this.previousClose});
 
