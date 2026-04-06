@@ -118,7 +118,7 @@ class CandlePoint {
 @immutable
 class WatchlistDetail {
   const WatchlistDetail({
-    required this.itemId,
+    required this.itemId, //symbol과 차이점은?
     required this.symbol,
     required this.market,
     required this.currency,

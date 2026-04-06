@@ -21,10 +21,11 @@ final Set<String> defaultNaverDomesticFavoriteIds = {
     canonicalDomesticFavoriteId(symbol),
 };
 
+//domestic: 붙인다
 String canonicalDomesticFavoriteId(String symbol) =>
     'domestic:${symbol.trim()}';
 
-//domestic : 을 떼어내는 역할
+//domestic: 을 떼어내는 역할
 String? domesticSymbolFromFavoriteId(String favoriteId) {
   const prefix = 'domestic:';
   if (!favoriteId.startsWith(prefix)) {

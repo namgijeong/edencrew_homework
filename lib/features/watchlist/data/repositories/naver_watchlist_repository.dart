@@ -95,11 +95,10 @@ class NaverWatchlistRepository implements WatchlistRepository {
       }
 
       //! null 아님을 보장
-       return _buildWatchlistItem(symbol:symbol,metadata:naverChartMetadataDtoMap[symbol]!, historicalEntry: historicalEntry, realtimeQuote:naverRealtimeQuoteDtoMap[symbol], latestDate:availableDates[0]);
+       return _buildWatchlistItem(symbol:symbol,metadata:naverChartMetadataDtoMap[symbol]!, historicalEntry: historicalEntry, realtimeQuote:naverRealtimeQuoteDtoMap[symbol], latestDate:_resolveAsOf(availableDates, asOf));
     }).toList();
 
-    WatchlistSnapshot watchlistSnapshot = WatchlistSnapshot(asOf:asOf ?? availableDates[0], items:items, availableDates:availableDates);
-
+    WatchlistSnapshot watchlistSnapshot = WatchlistSnapshot(asOf:asOf ?? _resolveAsOf(availableDates, asOf), items:items, availableDates:availableDates);
     return watchlistSnapshot;
 
     // throw UnimplementedError(
@@ -173,6 +172,47 @@ class NaverWatchlistRepository implements WatchlistRepository {
     //   previous 30 trading days (including the selected day).
     // - Use realtime data only for the latest trading day.
     // - Compute changeAmount, changeRate, volumeRatio, and candles.
+
+    //changeAmount, changeRate => NaverRealtimeQuoteDto 필요
+    //volumeRatio, and candles => NaverHistoricalPriceDto 필요
+
+    if (!_isCanonicalFavoriteId(symbol)){
+      throw FormatException('domestic 국내 주식만 볼 수 있습니다.');
+    }
+
+    var availableDates = await fetchAvailableDates();
+
+    //NaverRealtimeQuoteDto를 구하기 위해
+    var naverRealtimeQuoteDtoMap = await _loadRealtimeQuotes([symbol]);
+    var naverRealtimeQuoteDto = naverRealtimeQuoteDtoMap[symbol]!;
+
+    //NaverHistoricalPriceDto를 구하기 위해 _HistoricalEntry
+    //asOf가 없으면 최근것만
+    //asOf가 있으면 이전 30일 기록
+    var historicalEntry;
+    var historicalEntryList = <_HistoricalEntry>[];
+    final historicalFutures = <Future<_HistoricalEntry?>>[];
+    var candlePoints = <CandlePoint>[];
+    if (asOf == null){
+      historicalEntry = await _loadHistoricalEntryForDate(symbol:symbol, availableDates:availableDates, asOf:_resolveAsOf(availableDates, asOf));
+    } else {
+      var previous30Dates = getWindowDates(windowDatesDescending:availableDates, asOf:asOf);
+      previous30Dates.map((date){
+        historicalFutures.add(_loadHistoricalEntryForDate(symbol:symbol, availableDates:availableDates, asOf:date));
+      });
+
+      var result = await Future.wait(historicalFutures);
+      //whereType => Iterable
+      historicalEntryList = result.whereType<_HistoricalEntry>().toList();
+
+      // List<CandlePoint> _candles({
+      //   required List<DateTime> windowDatesDescending,
+      //   required Map<String, NaverHistoricalPriceDto> rowsByDate,
+      // })
+    }
+
+
+
     throw UnimplementedError(
       'TODO(assignment): implement NaverWatchlistRepository.fetchWatchlistDetail',
     );
@@ -253,6 +293,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
     return results;
   }
 
+  //fetchChartMetadata 불러오기 => symbol한개일때만 유용
   Future<NaverChartMetadataDto> _loadMetadata(String symbol) async {
     final cached = _metadataCache[symbol];
     if (cached != null) {
@@ -355,7 +396,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
     //     key: value
     // }
 
-    ////가장 마지막으로 책정된 가격 반환
+    //가장 마지막으로 책정된 가격 반환
     final previousClose = await _resolvePreviousClose(
       symbol: symbol,
       availableDates: availableDates,
@@ -370,7 +411,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
     return _HistoricalEntry(row: selectedRow, previousClose: previousClose);
   }
 
-  //입력한 date가 없을때 지정된 날짜를 찾는것 같다
+  //입력한 date가 없을때 
   Future<_HistoricalEntry?> _loadLatestHistoricalEntry(String symbol) async {
     //fetchDailyHistoryPage => NaverDailyHistoryPageDto 불러오기
     final firstPage = await _loadDailyHistoryPage(symbol, 1);
@@ -465,6 +506,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
     );
   }
 
+  //최근날짜 뽑기
   DateTime _resolveAsOf(
     List<DateTime> availableDates,
     DateTime? requestedAsOf,
@@ -518,6 +560,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
     return null;
   }
 
+  //WatchlistDetail의 volumeRatio 계산
   double _volumeRatio({
     required List<DateTime> windowDatesDescending,
     required Map<String, NaverHistoricalPriceDto> rowsByDate,
@@ -526,11 +569,13 @@ class NaverWatchlistRepository implements WatchlistRepository {
       return 0;
     }
 
+    //00.00.00으로 초기화 한후 날짜를 가지고 일별시세 NaverHistoricalPriceDto 뽑기
     final selectedRow = rowsByDate[_dateKey(windowDatesDescending.first)];
     if (selectedRow == null) {
       return 0;
     }
 
+    //거래량을 저장
     final previousVolumes = <int>[];
     for (
       var index = 1;
@@ -547,6 +592,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
       return 0;
     }
 
+    //reduce => 배열을 하나의 값으로 누적하는 함수
     final averageVolume =
         previousVolumes.reduce((left, right) => left + right) /
         previousVolumes.length;
@@ -554,15 +600,18 @@ class NaverWatchlistRepository implements WatchlistRepository {
       return 0;
     }
 
+    //최근 거래량 / 과거 평균 거래량
     return double.parse(
       (selectedRow.accumulatedTradingVolume / averageVolume).toStringAsFixed(2),
     );
   }
 
+  //WatchlistDetail의 candles
   List<CandlePoint> _candles({
     required List<DateTime> windowDatesDescending,
     required Map<String, NaverHistoricalPriceDto> rowsByDate,
   }) {
+    //reversed => 역순 => 오래된순부터 최신순
     return windowDatesDescending.reversed
         .map((date) => rowsByDate[_dateKey(date)])
         .whereType<NaverHistoricalPriceDto>()
@@ -576,14 +625,39 @@ class NaverWatchlistRepository implements WatchlistRepository {
             direction: directionFromDelta(item.closePrice - item.openPrice),
           ),
         )
-        .toList(growable: false);
+        .toList(growable: false); 
+    //toList(growable: false) => 크기 변경이 불가능한 리스트
   }
 
+  //선택한 날짜를 기준으로 선택한 날짜포함 30일전까지 날짜뽑기
+  List<DateTime> getWindowDates({
+    required List<DateTime> windowDatesDescending,
+    required DateTime asOf,
+    int daySize = 30,
+  }) {
+    final index = windowDatesDescending.indexWhere(
+          (d) =>
+      d.year == asOf.year &&
+          d.month == asOf.month &&
+          d.day == asOf.day,
+    );
+
+    if (index == -1) return [];
+
+    //skip(index) => index 만큼 리스트 맨앞에서 생략
+    return windowDatesDescending
+        .skip(index)
+        .take(daySize)
+        .toList();
+  }
+
+  //favoriteId가 형식을 지켰는지 판단
   bool _isCanonicalFavoriteId(String itemId) {
     return domesticSymbolFromFavoriteId(itemId) != null;
   }
 
   String _requireCanonicalFavoriteId(String itemId) {
+    //domestic : 을 떼어내는 역할
     final symbol = domesticSymbolFromFavoriteId(itemId);
     if (symbol == null) {
       throw ArgumentError.value(
@@ -592,6 +666,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
         'Naver repository only accepts canonical domestic favorite ids',
       );
     }
+    //domestic: 붙인다
     return canonicalDomesticFavoriteId(symbol);
   }
 
