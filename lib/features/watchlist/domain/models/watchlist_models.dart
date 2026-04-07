@@ -78,9 +78,9 @@ class StockSearchItem {
   StockSearchItem copyWith({
     String? id,
     MarketType? market,
-    String? marketLabel,
+    String? marketLabel, //의문: marketLabel이 정확히 의미하는것은?
     String? symbol,
-    String? name,
+    String? name, //의문:
     bool? isFavorite,
     Object? logoUrl = _sentinel,
   }) {
@@ -118,7 +118,7 @@ class CandlePoint {
 @immutable
 class WatchlistDetail {
   const WatchlistDetail({
-    required this.itemId, //symbol과 차이점은? watchlistitem의 id와 비슷한 역할로 추정
+    required this.itemId, //의문점: symbol과 차이점은? watchlistitem의 id와 비슷한 역할로 추정
     required this.symbol,
     required this.market,
     required this.currency,

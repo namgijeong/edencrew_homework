@@ -85,18 +85,19 @@ class NaverWatchlistRepository implements WatchlistRepository {
     //wathchlistitem을 하나씩 만든다
     List<WatchlistItem> items= [];
 
-    items = symbols.map((symbol) {
+    //map안에서 await를 사용하면 map의 최종결과는 Iterable<Future<T>>
+    items = await Future.wait(symbols.map((symbol) async {
       //symbol에 맞는 _HistoricalEntry 만들기
       var historicalEntry;
       if (asOf == null){
-        historicalEntry = _loadLatestHistoricalEntry(symbol);
+        historicalEntry =  await _loadLatestHistoricalEntry(symbol);
       } else {
-        historicalEntry = _loadHistoricalEntryForDate(symbol:symbol, availableDates:availableDates, asOf:asOf);
+        historicalEntry =  await _loadHistoricalEntryForDate(symbol:symbol, availableDates:availableDates, asOf:asOf);
       }
 
       //! null 아님을 보장
        return _buildWatchlistItem(symbol:symbol,metadata:naverChartMetadataDtoMap[symbol]!, historicalEntry: historicalEntry, realtimeQuote:naverRealtimeQuoteDtoMap[symbol], latestDate:_resolveAsOf(availableDates, asOf));
-    }).toList();
+    }).toList());
 
     WatchlistSnapshot watchlistSnapshot = WatchlistSnapshot(asOf:asOf ?? _resolveAsOf(availableDates, asOf), items:items, availableDates:availableDates);
     return watchlistSnapshot;
@@ -190,8 +191,6 @@ class NaverWatchlistRepository implements WatchlistRepository {
     //NaverRealtimeQuoteDto를 구하기 위해
     var naverRealtimeQuoteDtoMap = await _loadRealtimeQuotes([symbol]);
     var naverRealtimeQuoteDto = naverRealtimeQuoteDtoMap[symbol]!;
-    var changeAmount = naverRealtimeQuoteDto.changeAmount;
-    var changeRate = naverRealtimeQuoteDto.changeRate;
 
     //NaverHistoricalPriceDto를 구하기 위해 _HistoricalEntry
     //asOf가 없으면 최근것만
@@ -200,10 +199,10 @@ class NaverWatchlistRepository implements WatchlistRepository {
     var historicalEntryList = <_HistoricalEntry>[];
     final historicalFutures = <Future<_HistoricalEntry?>>[];
     var candlePoints = <CandlePoint>[];
-    var volumeRatio;
+    var volumeRatio = 0.0;
 
     if (asOf == null){
-      historicalEntry = await _loadHistoricalEntryForDate(symbol:symbol, availableDates:availableDates, asOf:_resolveAsOf(availableDates, asOf));
+      //historicalEntry = await _loadHistoricalEntryForDate(symbol:symbol, availableDates:availableDates, asOf:_resolveAsOf(availableDates, asOf));
     } else {
       var previous30Dates = getWindowDates(windowDatesDescending:availableDates, asOf:asOf);
       previous30Dates.map((date){
@@ -223,6 +222,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
 
     }
 
+    //의문점: asOf가 비어있을때 volumeRatio, candlePoints 값이 비어있어도 되는지?
     return buildWatchlistDetail(realtimeQuote:naverRealtimeQuoteDto, volumeRatio:volumeRatio, candles:candlePoints);
 
     // throw UnimplementedError(
@@ -243,9 +243,50 @@ class NaverWatchlistRepository implements WatchlistRepository {
     // - Convert every symbol into canonical id: domestic:{symbol}
     // - Set isFavorite by comparing against loadFavoriteIds().
     // - Fill logoUrl via _logoUrlResolver.
-    throw UnimplementedError(
-      'TODO(assignment): implement NaverWatchlistRepository.searchStocks',
-    );
+
+    var trimedQuery = query.trim();
+    if (trimedQuery == ''){
+        return [];
+    }
+
+    var naverAutocompleteItemDtoList = await _client.searchStocks(trimedQuery);
+    var canonicalSymbols = naverAutocompleteItemDtoList.map((item)=> _isCanonicalFavoriteId(item.code)).whereType<String>().toList();
+    //canonical 검사 통과한 dto들
+    //where => list를 필터링하는 함수
+    var canonicalNaverAutoCompleteItemDtoList = naverAutocompleteItemDtoList.where((item)=> _isCanonicalFavoriteId(item.code)).toList();
+
+    //set => list로 변환 필요
+    var deDuplicatedSymbols = canonicalSymbols.toSet().toList();
+    //deDuplicatedSymbols 검사 통과한 dto들
+    var deDuplicatedNaverAutoCompleteItemDtoList = canonicalNaverAutoCompleteItemDtoList.where((item) => deDuplicatedSymbols.contains(item.code)).toList();
+
+    //var canonicalIds = deDuplicatedSymbols.map((symbol) => _requireCanonicalFavoriteId(symbol)).toList();
+    //직접적인 NaverAutoCompleteItemDto의 요소 수정은 안되므로 새 리스트 생성
+    var newNaverAutoCompleteItemDtoList = deDuplicatedNaverAutoCompleteItemDtoList.map((item) {
+      return NaverAutocompleteItemDto(
+        code: _requireCanonicalFavoriteId(item.code),
+        name: item.name,
+        typeCode: item.typeCode,
+        typeName: item.typeName,
+        url: item.url,
+        nationCode: item.nationCode,
+        category: item.category,
+      );
+    }).toList();
+
+    //isFavorite 여부 loadFavoriteIds를 불러온후.contains(dto.code))
+    //logo url : _logoUrlResolver.resolveDomesticStockLogoUrl()
+
+    var favoriteIds = await loadFavoriteIds();
+
+    return newNaverAutoCompleteItemDtoList.map((item){
+      return buildStockSearchItem(autoCompleteItem:item, favoriteIds:favoriteIds);
+    }).toList();
+
+
+    // throw UnimplementedError(
+    //   'TODO(assignment): implement NaverWatchlistRepository.searchStocks',
+    // );
   }
 
   @override
@@ -743,6 +784,25 @@ class NaverWatchlistRepository implements WatchlistRepository {
     }
     //domestic: 붙인다
     return canonicalDomesticFavoriteId(symbol);
+  }
+
+  StockSearchItem buildStockSearchItem({
+    required NaverAutocompleteItemDto autoCompleteItem,
+    required favoriteIds,
+  }) {
+
+    //의문점:
+    //marketLabel과 name은 정확히 무엇을 넣는것인지 의문
+    //symbol을 넣을때는 domestic을 제거해야하는지
+    return StockSearchItem(
+      id: autoCompleteItem.code ,
+      market: MarketType.domestic,
+      marketLabel: autoCompleteItem.typeCode,
+      symbol: domesticSymbolFromFavoriteId(autoCompleteItem.code)!, 
+      name : autoCompleteItem.name,
+      isFavorite : favoriteIds.contains(autoCompleteItem.code),
+      logoUrl : _logoUrlResolver.resolveDomesticStockLogoUrl(domesticSymbolFromFavoriteId(autoCompleteItem.code)!),
+    );
   }
 
   String _dailyHistoryPageCacheKey(String symbol, int page) => '$symbol::$page';
