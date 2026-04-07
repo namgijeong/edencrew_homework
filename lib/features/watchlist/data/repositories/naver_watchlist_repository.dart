@@ -173,6 +173,11 @@ class NaverWatchlistRepository implements WatchlistRepository {
     // - Use realtime data only for the latest trading day.
     // - Compute changeAmount, changeRate, volumeRatio, and candles.
 
+    // changeRate = 현재가 기준 등락률
+    // openChangeRate = 시가가 전일 종가 대비 얼마나 변했는지
+    // highChangeRate = 고가가 전일 종가 대비 얼마나 변했는지
+    // lowChangeRate = 저가가 전일 종가 대비 얼마나 변했는지
+
     //changeAmount, changeRate => NaverRealtimeQuoteDto 필요
     //volumeRatio, and candles => NaverHistoricalPriceDto 필요
 
@@ -185,6 +190,8 @@ class NaverWatchlistRepository implements WatchlistRepository {
     //NaverRealtimeQuoteDto를 구하기 위해
     var naverRealtimeQuoteDtoMap = await _loadRealtimeQuotes([symbol]);
     var naverRealtimeQuoteDto = naverRealtimeQuoteDtoMap[symbol]!;
+    var changeAmount = naverRealtimeQuoteDto.changeAmount;
+    var changeRate = naverRealtimeQuoteDto.changeRate;
 
     //NaverHistoricalPriceDto를 구하기 위해 _HistoricalEntry
     //asOf가 없으면 최근것만
@@ -193,6 +200,8 @@ class NaverWatchlistRepository implements WatchlistRepository {
     var historicalEntryList = <_HistoricalEntry>[];
     final historicalFutures = <Future<_HistoricalEntry?>>[];
     var candlePoints = <CandlePoint>[];
+    var volumeRatio;
+
     if (asOf == null){
       historicalEntry = await _loadHistoricalEntryForDate(symbol:symbol, availableDates:availableDates, asOf:_resolveAsOf(availableDates, asOf));
     } else {
@@ -205,17 +214,20 @@ class NaverWatchlistRepository implements WatchlistRepository {
       //whereType => Iterable
       historicalEntryList = result.whereType<_HistoricalEntry>().toList();
 
-      // List<CandlePoint> _candles({
-      //   required List<DateTime> windowDatesDescending,
-      //   required Map<String, NaverHistoricalPriceDto> rowsByDate,
-      // })
+      Map<String, NaverHistoricalPriceDto> rowsByDate = Map.fromEntries(
+          historicalEntryList.map((historical) => MapEntry(_dateKey(historical.row.localDate), historical.row))
+      );
+
+      volumeRatio =  _volumeRatio(windowDatesDescending:previous30Dates, rowsByDate:rowsByDate);
+      candlePoints = _candles(windowDatesDescending:previous30Dates, rowsByDate:rowsByDate);
+
     }
 
+    return buildWatchlistDetail(realtimeQuote:naverRealtimeQuoteDto, volumeRatio:volumeRatio, candles:candlePoints);
 
-
-    throw UnimplementedError(
-      'TODO(assignment): implement NaverWatchlistRepository.fetchWatchlistDetail',
-    );
+    // throw UnimplementedError(
+    //   'TODO(assignment): implement NaverWatchlistRepository.fetchWatchlistDetail',
+    // );
   }
 
   @override
@@ -649,6 +661,69 @@ class NaverWatchlistRepository implements WatchlistRepository {
         .skip(index)
         .take(daySize)
         .toList();
+  }
+
+  //전일 종가 대비 얼마나 변했는지 %
+  double _calculateChangeRate({
+    required double price,
+    required double previousClose,
+  }) {
+    if (previousClose == 0) return 0;
+    return ((price - previousClose) / previousClose) * 100;
+  }
+
+  WatchlistDetail buildWatchlistDetail({
+    required NaverRealtimeQuoteDto realtimeQuote,
+    required double volumeRatio,
+    required List<CandlePoint> candles,
+  }) {
+    final previousClose = realtimeQuote.previousClose;
+    final currentPrice = realtimeQuote.currentPrice;
+    final openPrice = realtimeQuote.openPrice;
+    final highPrice = realtimeQuote.highPrice;
+    final lowPrice = realtimeQuote.lowPrice;
+
+    final changeAmount = currentPrice - previousClose;
+    final changeRate = _calculateChangeRate(
+      price: currentPrice,
+      previousClose: previousClose,
+    );
+
+    final openChangeRate = _calculateChangeRate(
+      price: openPrice,
+      previousClose: previousClose,
+    );
+
+    final highChangeRate = _calculateChangeRate(
+      price: highPrice,
+      previousClose: previousClose,
+    );
+
+    final lowChangeRate = _calculateChangeRate(
+      price: lowPrice,
+      previousClose: previousClose,
+    );
+
+
+    //watchListItem을 build할때 사용했던 방식대로, itemId, market, currency를 사용하는것이 낫겠다
+    return WatchlistDetail(
+      itemId: canonicalDomesticFavoriteId(realtimeQuote.symbol),
+      symbol: realtimeQuote.symbol,
+      market: MarketType.domestic,
+      currency: 'KRW',
+      currentPrice: currentPrice,
+      changeAmount: changeAmount,
+      changeRate: changeRate,
+      tradeVolume: realtimeQuote.accumulatedTradingVolume,
+      volumeRatio: volumeRatio,
+      openPrice: openPrice,
+      openChangeRate: openChangeRate,
+      highPrice: highPrice,
+      highChangeRate: highChangeRate,
+      lowPrice: lowPrice,
+      lowChangeRate: lowChangeRate,
+      candles: candles,
+    );
   }
 
   //favoriteId가 형식을 지켰는지 판단
