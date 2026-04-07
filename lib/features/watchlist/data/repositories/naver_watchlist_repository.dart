@@ -96,7 +96,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
       }
 
       //! null 아님을 보장
-       return _buildWatchlistItem(symbol:symbol,metadata:naverChartMetadataDtoMap[symbol]!, historicalEntry: historicalEntry, realtimeQuote:naverRealtimeQuoteDtoMap[symbol], latestDate:_resolveAsOf(availableDates, asOf));
+       return _buildWatchlistItem(symbol:symbol,metadata:naverChartMetadataDtoMap[symbol]!, historicalEntry: historicalEntry, realtimeQuote:naverRealtimeQuoteDtoMap[symbol], latestDate: availableDates[0]);
     }).toList());
 
     WatchlistSnapshot watchlistSnapshot = WatchlistSnapshot(asOf:asOf ?? _resolveAsOf(availableDates, asOf), items:items, availableDates:availableDates);
@@ -559,7 +559,7 @@ class NaverWatchlistRepository implements WatchlistRepository {
     );
   }
 
-  //최근날짜 뽑기
+  //최근날짜 뽑기, 만약 asOf가 있으면 asOf 반환
   DateTime _resolveAsOf(
     List<DateTime> availableDates,
     DateTime? requestedAsOf,
